@@ -17,7 +17,7 @@ fn decode_bencoded_value(encoded_value: &str) -> serde_json::Value {
         let i_index = encoded_value.find('i').unwrap();
         let e_index = encoded_value.find('e').unwrap();
         let number_string = &encoded_value[i_index + 1..e_index];
-        let number = number_string.parse::<i32>().unwrap();
+        let number = number_string.parse::<i64>().unwrap();
         return serde_json::Value::Number(Number::from(number));
     } else {
         panic!("Unhandled encoded value: {}", encoded_value)
