@@ -30,6 +30,15 @@ impl Map {
     }
 }
 
+
+impl Iterator for Map {
+    type Item = (Vec<u8>, Value);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.pop_first()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Value {
     String(Vec<u8>),
