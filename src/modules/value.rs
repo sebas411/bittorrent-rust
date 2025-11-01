@@ -43,7 +43,7 @@ impl Iterator for Map {
 pub enum Value {
     String(Vec<u8>),
     Int(i64),
-    List(Vec<Value>),
+    List(Vec<Self>),
     Map(Map),
 }
 
@@ -84,6 +84,20 @@ impl Value {
     pub fn get_string(self) -> Option<Vec<u8>> {
         if let Self::String(s) = self {
             Some(s)
+        } else {
+            None
+        }
+    }
+    pub fn get_int(self) -> Option<i64> {
+        if let Self::Int(i) = self {
+            Some(i)
+        } else {
+            None
+        }
+    }
+    pub fn _get_list(self) -> Option<Vec<Self>> {
+        if let Self::List(l) = self {
+            Some(l)
         } else {
             None
         }
