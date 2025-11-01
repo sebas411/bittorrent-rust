@@ -64,7 +64,7 @@ fn main() {
         "decode" => {
             let encoded_value = &args[2];
             let (decoded_value, _) = decode_bencoded_value(encoded_value.as_bytes());
-            println!("{}", decoded_value.to_string());
+            println!("{}", decoded_value);
         },
         "info" => {
             let filename = &args[2];

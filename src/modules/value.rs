@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fmt};
 
 #[derive(Debug, Clone)]
 pub struct Map(BTreeMap<Vec<u8>, Value>);
@@ -14,7 +14,7 @@ impl Map {
         let mut map_string = String::from('{');
         for (i, (k, v)) in self.0.iter().enumerate() {
             let key_string = String::from_utf8(k.clone()).unwrap_or("String not in utf8".into());
-            map_string.push_str(&format!("\"{}\":{}", key_string, v.to_string()));
+            map_string.push_str(&format!("\"{}\":{}", key_string, v));
             if i != self.0.len() - 1 {
                 map_string.push(',');
             }
@@ -43,7 +43,7 @@ impl Value {
         match self {
             Self::String(value) => {
                 if let Ok(string_value) = String::from_utf8(value.clone()) {
-                    format!("\"{}\"", string_value)
+                    string_value
                 } else {
                     "String not in utf8".into()
                 }
@@ -52,7 +52,7 @@ impl Value {
             Self::List(list) => {
                 let mut output = String::from("[");
                 for (i, val) in list.iter().enumerate() {
-                    output.push_str(&val.to_string());
+                    output.push_str(&format!("{}", val));
                     if i != list.len() - 1 {
                         output.push(',');
                     }
@@ -71,5 +71,14 @@ impl Value {
         } else {
             None
         }
+    }
+}
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Self::String(_) = self {
+            return write!(f, "\"{}\"", self.to_string())
+        }
+        write!(f, "{}", self.to_string())
     }
 }
