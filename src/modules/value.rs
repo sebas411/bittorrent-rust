@@ -81,6 +81,13 @@ impl Value {
             None
         }
     }
+    pub fn get_string(self) -> Option<Vec<u8>> {
+        if let Self::String(s) = self {
+            Some(s)
+        } else {
+            None
+        }
+    }
 }
 
 impl fmt::Display for Value {
