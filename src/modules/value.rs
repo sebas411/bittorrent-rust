@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+#[derive(Debug, Clone)]
 pub struct Map(BTreeMap<Vec<u8>, Value>);
 
 impl Map {
@@ -21,8 +22,15 @@ impl Map {
         map_string.push('}');
         map_string
     }
+    pub fn get(&self, key: &str) -> Option<Value> {
+        match self.0.get(key.as_bytes()) {
+            Some(value) => Some(value.clone()),
+            None => None
+        }
+    }
 }
 
+#[derive(Debug, Clone)]
 pub enum Value {
     String(Vec<u8>),
     Int(i64),
@@ -55,6 +63,13 @@ impl Value {
             Self::Map(map) => {
                 map.to_string()
             },
+        }
+    }
+    pub fn get_map(self) -> Option<Map> {
+        if let Self::Map(map) = self {
+            Some(map)
+        } else {
+            None
         }
     }
 }

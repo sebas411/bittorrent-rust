@@ -1,5 +1,5 @@
 mod modules;
-use std::env;
+use std::{env, fs};
 use crate::modules::value::{Map, Value};
 
 fn is_digit(c: char) -> bool {
@@ -65,6 +65,20 @@ fn main() {
             let encoded_value = &args[2];
             let (decoded_value, _) = decode_bencoded_value(encoded_value.as_bytes());
             println!("{}", decoded_value.to_string());
+        },
+        "info" => {
+            let filename = &args[2];
+            let contents = fs::read(filename).unwrap();
+            let (decoded_value, _) = decode_bencoded_value(&contents);
+            if let Some(torrent_map) = decoded_value.get_map() {
+                let tracker_url = torrent_map.get("announce").unwrap();
+                let info_map = torrent_map.get("info").unwrap().get_map().unwrap();
+                let length = info_map.get("length").unwrap();
+                println!("Tracker URL: {}", tracker_url.to_string());
+                println!("Length: {}", length.to_string());
+            } else {
+                panic!("Bad .torrent file")
+            }
         },
         _ => {
             println!("unknown command: {}", args[1])
