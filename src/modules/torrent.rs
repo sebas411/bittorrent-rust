@@ -1,3 +1,4 @@
+use hex::decode;
 use sha1::{Digest, Sha1};
 
 use crate::modules::{bencode::encode_value, value::Value};
@@ -21,6 +22,7 @@ pub struct Info {
     hash: String,
 }
 
+#[allow(dead_code)]
 impl Info {
     fn new(val: Value) -> Option<Self> {
         if let Value::Map(info_map) = val {
@@ -48,11 +50,21 @@ impl Info {
             println!("{}", piece_hash);
         }
     }
+    pub fn get_info_hash(&self) -> String {
+        self.hash.clone()
+    }
+    pub fn get_info_hash_bytes(&self) -> Vec<u8> {
+        let hex_str = &self.hash;
+        decode(hex_str).unwrap()
+    }
+    pub fn get_length(&self) -> i64 {
+        self.length
+    }
 }
 
 pub struct Torrent {
     announce: String,
-    info: Info,
+    pub info: Info,
 }
 
 impl Torrent {
@@ -62,7 +74,6 @@ impl Torrent {
         let info = Info::new(torrent_map.get("info")?)?;
         Some(Self { announce, info })
     }
-
     pub fn print_info(&self) {
         println!("Tracker URL: {}", self.announce);
         println!("Length: {}", self.info.length);
@@ -70,5 +81,8 @@ impl Torrent {
         println!("Piece Length: {}", self.info.piece_length);
         println!("Piece Hashes: ");
         self.info.print_piece_hashes();
+    }
+    pub fn get_url(&self) -> String {
+        self.announce.clone()
     }
 }

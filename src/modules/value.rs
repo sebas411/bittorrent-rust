@@ -3,6 +3,7 @@ use std::{collections::BTreeMap, fmt};
 #[derive(Debug, Clone)]
 pub struct Map(BTreeMap<Vec<u8>, Value>);
 
+#[allow(dead_code)]
 impl Map {
     pub fn new() -> Self {
         Self(BTreeMap::new())
@@ -27,6 +28,14 @@ impl Map {
             Some(value) => Some(value.clone()),
             None => None
         }
+    }
+    pub fn keys(&self) -> Vec<String> {
+        let mut result = vec![];
+        for entry in self.0.keys() {
+            let str_entry = String::from_utf8(entry.to_vec()).unwrap_or("".into());
+            result.push(str_entry);
+        }
+        result
     }
 }
 
