@@ -70,6 +70,9 @@ impl Info {
     pub fn get_file_size(&self) -> usize {
         self.length as usize
     }
+    pub fn total_pieces(&self) -> usize {
+        self.pieces.len()
+    }
 }
 
 pub struct Torrent {

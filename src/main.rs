@@ -235,6 +235,49 @@ fn main() {
             file.write_all(&piece).unwrap();
             println!("Piece downloaded.");
         },
+        "download" => {
+            // download -o /tmp/test.txt sample.torrent
+            let mut set_storage_location = false;
+            let mut storage_location = String::new();
+            let mut filename = String::new();
+            let mut values_set = (false, false);
+            for i in 2..args.len() {
+                let arg = &args[i];
+                if set_storage_location {
+                    set_storage_location = false;
+                    storage_location = arg.into();
+                    values_set.0 = true;
+                    continue;
+                }
+                if arg == "-o" {
+                    set_storage_location = true;
+                    continue;
+                }
+                if !values_set.1 {
+                    filename = arg.into();
+                    values_set.1 = true;
+                } else {
+                    panic!("Unexpected parameter for download_piece");
+                }
+            }
+            if values_set != (true, true) {
+                panic!("Missing parameters for download")
+            }
+            let content = fs::read(filename).unwrap();
+            let (decoded_value, _) = decode_bencoded_value(&content);
+            let torrent = Torrent::new(decoded_value).unwrap();
+            let my_id = generate_random_string(20);
+            let peers = get_peers(&torrent, &my_id);
+            let piece_num = torrent.info.total_pieces();
+            let mut file_contents = vec![];
+            for i in 0..piece_num {
+                let peer = format!("{}:{}", peers[i%peers.len()].0, peers[i%peers.len()].1);
+                file_contents.extend(download_piece(&torrent, &my_id, &peer, i));
+            }
+            let mut file = File::create(storage_location).unwrap();
+            file.write_all(&file_contents).unwrap();
+            println!("File downloaded.")
+        },
         _ => {
             println!("unknown command: {}", args[1])
         },
