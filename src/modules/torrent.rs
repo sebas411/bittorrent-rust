@@ -60,6 +60,16 @@ impl Info {
     pub fn get_length(&self) -> i64 {
         self.length
     }
+    pub fn get_piece(&self, piece_index: usize) -> [u8; 20] {
+        let piece = self.pieces[piece_index];
+        piece
+    }
+    pub fn get_piece_size(&self) -> usize {
+        self.piece_length as usize
+    }
+    pub fn get_file_size(&self) -> usize {
+        self.length as usize
+    }
 }
 
 pub struct Torrent {
