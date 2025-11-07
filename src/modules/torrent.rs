@@ -99,3 +99,36 @@ impl Torrent {
         self.announce.clone()
     }
 }
+
+pub struct Magnet {
+    tracker: Option<String>,
+    info_hash: String,
+    _filename: Option<String>,
+}
+
+impl Magnet {
+    pub fn new(magnet_link: &str) -> Option<Self> {
+        let params_str = magnet_link.strip_prefix("magnet:?").unwrap();
+        let mut filename = None;
+        let mut tracker = None;
+        let mut info_hash = None;
+        for param_str in params_str.split('&') {
+            let eq_index = param_str.find('=').unwrap();
+            let (name, value) = param_str.split_at(eq_index);
+            let value = value.strip_prefix('=').unwrap();
+            if name == "xt" {
+                info_hash = Some(value.strip_prefix("urn:btih:").unwrap().into());
+            } else if name == "dn" {
+                filename = Some(value.into());
+            } else if name == "tr" {
+                let tracker_decoded: String = urlencoding::decode(value).unwrap().into();
+                tracker = Some(tracker_decoded.trim().into());
+            }
+        }
+        Some(Self { tracker, info_hash: info_hash?, _filename: filename})
+    }
+    pub fn print_info(&self) {
+        println!("Tracker URL: {}", self.tracker.clone().unwrap());
+        println!("Info Hash: {}", self.info_hash)
+    }
+}
