@@ -57,9 +57,6 @@ impl Info {
         let hex_str = &self.hash;
         decode(hex_str).unwrap()
     }
-    pub fn get_length(&self) -> i64 {
-        self.length
-    }
     pub fn get_piece(&self, piece_index: usize) -> [u8; 20] {
         let piece = self.pieces[piece_index];
         piece
@@ -130,5 +127,12 @@ impl Magnet {
     pub fn print_info(&self) {
         println!("Tracker URL: {}", self.tracker.clone().unwrap());
         println!("Info Hash: {}", self.info_hash)
+    }
+    pub fn get_info_hash_bytes(&self) -> Vec<u8> {
+        let hex_str = &self.info_hash;
+        decode(hex_str).unwrap()
+    }
+    pub fn get_url(&self) -> Option<String> {
+        self.tracker.clone()
     }
 }

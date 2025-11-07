@@ -4,12 +4,10 @@ use sha1::{Digest, Sha1};
 
 use crate::{bytes_to_peer_list, modules::{bencode::decode_bencoded_value, torrent::Torrent}};
 
-pub fn get_peers(torrent: &Torrent, peer_id: &str) -> Vec<(String, u16)> {
-    let req_url = torrent.get_url();
-    let info_hash = torrent.info.get_info_hash_bytes();
+pub fn get_peers(announce: &str, info_hash: &[u8], peer_id: &str, file_size: usize) -> Vec<(String, u16)> {
+    let req_url = String::from(announce);
     let info_hash_encoded = percent_encode(&info_hash, NON_ALPHANUMERIC).to_string();
     let port = 6881;
-    let file_size = torrent.info.get_length();
     let query_params = format!("?info_hash={}&peer_id={}&port={}&uploaded=0&downloaded=0&left={}&compact=1", info_hash_encoded, peer_id, port, file_size);
     let url = req_url + &query_params;
     let response = reqwest::blocking::get(url).unwrap().bytes().unwrap();
@@ -19,18 +17,22 @@ pub fn get_peers(torrent: &Torrent, peer_id: &str) -> Vec<(String, u16)> {
     peers
 }
 
-pub fn get_handshake(torrent: &Torrent, peer_id: &str) -> Vec<u8> {
+pub fn get_handshake(info_hash: &[u8], peer_id: &str, metadata_support: bool) -> Vec<u8> {
     let mut handshake = vec![];
+    let mut reserved_bytes = [0u8; 8];
+    if metadata_support {
+        reserved_bytes[5] = 16;
+    }
     handshake.push(19u8);                                        // length of protocol string
     handshake.extend("BitTorrent protocol".as_bytes());    // protocol
-    handshake.extend(&[0u8; 8]);                           // reserved bytes
-    handshake.extend(torrent.info.get_info_hash_bytes());  // info hash
+    handshake.extend(&reserved_bytes);                           // reserved bytes
+    handshake.extend(info_hash);  // info hash
     handshake.extend(peer_id.as_bytes());                  // peer id
     handshake
 }
 
 pub fn download_piece(torrent: &Torrent, self_id: &str, peer: &str, piece_index: usize) -> Vec<u8> {
-    let handshake = get_handshake(torrent, self_id);
+    let handshake = get_handshake(&torrent.info.get_info_hash_bytes(), self_id, false);
     let piece_hash = torrent.info.get_piece(piece_index);
     let mut piece_size = torrent.info.get_piece_size();
     let file_size = torrent.info.get_file_size();

@@ -45,7 +45,7 @@ fn main() {
             let torrent = Torrent::new(decoded_value).unwrap();
             
             let peer_id = generate_random_string(20);
-            let peers = get_peers(&torrent, &peer_id);
+            let peers = get_peers(&torrent.get_url(), &torrent.info.get_info_hash_bytes(), &peer_id, torrent.info.get_file_size());
             for peer in peers {
                 println!("{}:{}", peer.0, peer.1)
             }
@@ -59,7 +59,7 @@ fn main() {
             let peer = &args[3];
 
             let self_id = generate_random_string(20);
-            let handshake = get_handshake(&torrent, &self_id);
+            let handshake = get_handshake(&torrent.info.get_info_hash_bytes(), &self_id, false);
 
             let mut stream = TcpStream::connect(peer).expect("Failed to connect");
             stream.write_all(&handshake).expect("Failed to write to stream");
@@ -108,7 +108,7 @@ fn main() {
             let (decoded_value, _) = decode_bencoded_value(&content);
             let torrent = Torrent::new(decoded_value).unwrap();
             let my_id = generate_random_string(20);
-            let peers = get_peers(&torrent, &my_id);
+            let peers = get_peers(&torrent.get_url(), &torrent.info.get_info_hash_bytes(), &my_id, torrent.info.get_file_size());
             let peer = format!("{}:{}", peers[0].0, peers[0].1);
             let piece = download_piece(&torrent, &my_id, &peer, piece_index);
             let mut file = File::create(storage_location).unwrap();
@@ -147,7 +147,7 @@ fn main() {
             let (decoded_value, _) = decode_bencoded_value(&content);
             let torrent = Torrent::new(decoded_value).unwrap();
             let my_id = generate_random_string(20);
-            let peers = get_peers(&torrent, &my_id);
+            let peers = get_peers(&torrent.get_url(), &torrent.info.get_info_hash_bytes(), &my_id, torrent.info.get_file_size());
             let piece_num = torrent.info.total_pieces();
             let mut file_contents = vec![];
             for i in 0..piece_num {
@@ -162,6 +162,26 @@ fn main() {
             let magnet_link = &args[2];
             let magnet = Magnet::new(magnet_link).unwrap();
             magnet.print_info();
+        },
+        "magnet_handshake" => {
+            let magnet_link = &args[2];
+            let magnet = Magnet::new(magnet_link).unwrap();
+            let my_id = generate_random_string(20);
+            let info_hash = magnet.get_info_hash_bytes();
+            let handshake = get_handshake(&info_hash, &my_id, true);
+            let peers = get_peers(&magnet.get_url().unwrap(), &info_hash, &my_id, 999);
+            let peer = format!("{}:{}", peers[0].0, peers[0].1);
+
+            let mut stream = TcpStream::connect(peer).expect("Failed to connect");
+            stream.write_all(&handshake).expect("Failed to write to stream");
+
+            let mut buffer = [0; 1024];
+            stream.read(&mut buffer).expect("Failed to read from stream");
+            let protocol_length = buffer[0] as usize;
+            let start = 1 + protocol_length + 8 + 20;
+            let peer_id = buffer[start..start+20].to_vec();
+            let peer_id = hex::encode(peer_id);
+            println!("Peer ID: {}", peer_id);
         },
         _ => {
             println!("unknown command: {}", args[1])
