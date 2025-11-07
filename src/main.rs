@@ -176,12 +176,20 @@ fn main() {
             stream.write_all(&handshake).expect("Failed to write to stream");
 
             let mut buffer = [0; 1024];
-            stream.read(&mut buffer).expect("Failed to read from stream");
+            stream.read_exact(&mut buffer[0..1]).expect("Failed to read from stream");
             let protocol_length = buffer[0] as usize;
+            stream.read_exact(&mut buffer[1..1+protocol_length+8+20+20]).unwrap();
             let has_extension_support = buffer[1+protocol_length+5] & 16u8 > 0;
             let start = 1 + protocol_length + 8 + 20;
             let peer_id = buffer[start..start+20].to_vec();
             let peer_id = hex::encode(peer_id);
+
+            // wait for bitfield
+            stream.read_exact(&mut buffer[..5]).expect("Failed to read from stream");
+            let message_type = buffer[4];
+            if message_type != 5 {
+                panic!("Didn't get bitfield message {}", message_type);
+            }
             
             //extension handshake
             if has_extension_support {
@@ -191,7 +199,7 @@ fn main() {
                 outer_dict.insert("m".as_bytes().to_vec(), Value::Map(inner_dict));
                 let bencoded_value = encode_value(Value::Map(outer_dict));
                 let mut extension_handshake = vec![];
-                extension_handshake.push(bencoded_value.len() as u8 + 2);
+                extension_handshake.extend((bencoded_value.len() as u32 + 2).to_be_bytes());
                 extension_handshake.push(20);
                 extension_handshake.push(0);
                 extension_handshake.extend(bencoded_value);
