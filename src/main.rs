@@ -3,7 +3,7 @@ use std::{env, fs::{self, File}, io::{Read, Write}, net::TcpStream};
 use rand::{distr::{Alphanumeric, SampleString}};
 use rand::rng;
 
-use crate::modules::{bencode::decode_bencoded_value, helpers::{download_piece, get_handshake, get_peers}, torrent::{Magnet, Torrent}};
+use crate::modules::{bencode::{decode_bencoded_value, encode_value}, helpers::{download_piece, get_handshake, get_peers}, torrent::{Magnet, Torrent}, value::{Map, Value}};
 
 fn bytes_to_peer_list(bytes: &[u8]) -> Vec<(String, u16)> {
     let mut i = 0;
@@ -178,9 +178,28 @@ fn main() {
             let mut buffer = [0; 1024];
             stream.read(&mut buffer).expect("Failed to read from stream");
             let protocol_length = buffer[0] as usize;
+            let has_extension_support = buffer[1+protocol_length+5] & 16u8 > 0;
             let start = 1 + protocol_length + 8 + 20;
             let peer_id = buffer[start..start+20].to_vec();
             let peer_id = hex::encode(peer_id);
+            
+            //extension handshake
+            if has_extension_support {
+                let mut inner_dict = Map::new();
+                inner_dict.insert("ut_metadata".as_bytes().to_vec(), Value::Int(1));
+                let mut outer_dict = Map::new();
+                outer_dict.insert("m".as_bytes().to_vec(), Value::Map(inner_dict));
+                let bencoded_value = encode_value(Value::Map(outer_dict));
+                let mut extension_handshake = vec![];
+                extension_handshake.push(bencoded_value.len() as u8 + 2);
+                extension_handshake.push(20);
+                extension_handshake.push(0);
+                extension_handshake.extend(bencoded_value);
+                stream.write_all(&extension_handshake).expect("Couldn't write to stream");
+
+                stream.read(&mut buffer).expect("Couldn't read from stream");
+            }
+
             println!("Peer ID: {}", peer_id);
         },
         _ => {
