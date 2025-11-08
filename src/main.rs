@@ -185,12 +185,15 @@ fn main() {
             let peer_id = hex::encode(peer_id);
 
             // wait for bitfield
-            stream.read_exact(&mut buffer[..5]).expect("Failed to read from stream");
+            stream.read_exact(&mut buffer[..4]).expect("Failed to read from stream");
+            let length = u32::from_be_bytes(buffer[0..4].try_into().unwrap());
+            stream.read_exact(&mut buffer[4..4+length as usize]).unwrap();
             let message_type = buffer[4];
             if message_type != 5 {
                 panic!("Didn't get bitfield message {}", message_type);
             }
             
+            println!("Peer ID: {}", peer_id);
             //extension handshake
             if has_extension_support {
                 let mut inner_dict = Map::new();
@@ -205,10 +208,23 @@ fn main() {
                 extension_handshake.extend(bencoded_value);
                 stream.write_all(&extension_handshake).expect("Couldn't write to stream");
 
-                stream.read(&mut buffer).expect("Couldn't read from stream");
+                stream.read_exact(&mut buffer[0..4]).expect("Couldn't read from stream");
+                let length = u32::from_be_bytes(buffer[0..4].try_into().unwrap());
+                stream.read_exact(&mut buffer[4..4+length as usize]).expect("Failed to read from stream");
+                let message_type = buffer[4];
+                if message_type != 20 {
+                    panic!("Didn't get extension handshake type {}", message_type)
+                }
+                let bencoded_dict = &buffer[6..4+length as usize];
+                let outer_dict = decode_bencoded_value(bencoded_dict).0.get_map().unwrap();
+                let inner_dict = outer_dict.get("m").unwrap().get_map().unwrap();
+                let result = inner_dict.get("ut_metadata");
+                if let Some(metadata_ext_id) = result {
+                    let metadata_ext_id  = metadata_ext_id.get_int().unwrap();
+                    println!("Peer Metadata Extension ID: {}", metadata_ext_id);
+                }
             }
 
-            println!("Peer ID: {}", peer_id);
         },
         _ => {
             println!("unknown command: {}", args[1])
