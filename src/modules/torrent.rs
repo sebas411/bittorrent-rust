@@ -1,7 +1,9 @@
+use std::{io::{Read, Write}, net::TcpStream};
+
 use hex::decode;
 use sha1::{Digest, Sha1};
 
-use crate::modules::{bencode::encode_value, value::Value};
+use crate::{generate_random_string, modules::{bencode::{decode_bencoded_value, encode_value}, helpers::{get_handshake, get_peers}, value::{Map, Value}}};
 
 fn get_pieces_hashes(input: &[u8]) -> Vec<[u8; 20]> {
     let mut i = 0;
@@ -83,6 +85,73 @@ impl Torrent {
         let announce = String::from_utf8(torrent_map.get("announce")?.get_string()?).unwrap();
         let info = Info::new(torrent_map.get("info")?)?;
         Some(Self { announce, info })
+    }
+    pub fn from_magnet(magnet: Magnet) -> Option<()> {
+        let my_id = generate_random_string(20);
+        let info_hash = magnet.get_info_hash_bytes();
+        let handshake = get_handshake(&info_hash, &my_id, true);
+        let peers = get_peers(&magnet.get_url().unwrap(), &info_hash, &my_id, 999);
+        let peer = format!("{}:{}", peers[0].0, peers[0].1);
+
+        let mut stream = TcpStream::connect(peer).expect("Failed to connect");
+        stream.write_all(&handshake).expect("Failed to write to stream");
+
+        let mut buffer = [0; 1024];
+        stream.read_exact(&mut buffer[0..1]).expect("Failed to read from stream");
+        let protocol_length = buffer[0] as usize;
+        stream.read_exact(&mut buffer[1..1+protocol_length+8+20+20]).unwrap();
+        let has_extension_support = buffer[1+protocol_length+5] & 16u8 > 0;
+
+        // wait for bitfield
+        stream.read_exact(&mut buffer[..4]).expect("Failed to read from stream");
+        let length = u32::from_be_bytes(buffer[0..4].try_into().unwrap());
+        stream.read_exact(&mut buffer[4..4+length as usize]).unwrap();
+        let message_type = buffer[4];
+
+        if message_type != 5 || !has_extension_support {
+            return None
+        }
+
+        //extension handshake
+        let mut inner_dict = Map::new();
+        inner_dict.insert("ut_metadata".as_bytes().to_vec(), Value::Int(1));
+        let mut outer_dict = Map::new();
+        outer_dict.insert("m".as_bytes().to_vec(), Value::Map(inner_dict));
+        let bencoded_value = encode_value(Value::Map(outer_dict));
+        let mut extension_handshake = vec![];
+        extension_handshake.extend((bencoded_value.len() as u32 + 2).to_be_bytes());
+        extension_handshake.push(20);
+        extension_handshake.push(0);
+        extension_handshake.extend(bencoded_value);
+        stream.write_all(&extension_handshake).expect("Couldn't write to stream");
+
+        stream.read_exact(&mut buffer[0..4]).expect("Couldn't read from stream");
+        let length = u32::from_be_bytes(buffer[0..4].try_into().unwrap());
+        stream.read_exact(&mut buffer[4..4+length as usize]).expect("Failed to read from stream");
+        let message_type = buffer[4];
+        if message_type != 20 {
+            return None
+        }
+        let bencoded_dict = &buffer[6..4+length as usize];
+        let outer_dict = decode_bencoded_value(bencoded_dict).0.get_map().unwrap();
+        let inner_dict = outer_dict.get("m").unwrap().get_map().unwrap();
+        let metadata_ext_id = inner_dict.get("ut_metadata")?;
+        let metadata_ext_id  = metadata_ext_id.get_int().unwrap() as u8;
+
+        let mut request_dict = Map::new();
+        request_dict.insert("msg_type".as_bytes().to_vec(), Value::Int(0));
+        request_dict.insert("piece".as_bytes().to_vec(), Value::Int(0));
+        let request_dict_encoded = encode_value(Value::Map(request_dict));
+
+        let mut info_request = vec![];
+        info_request.extend((2 + request_dict_encoded.len() as u32).to_be_bytes());
+        info_request.push(20);
+        info_request.push(metadata_ext_id);
+        info_request.extend(request_dict_encoded);
+
+        stream.write_all(&info_request).unwrap();
+
+        None
     }
     pub fn print_info(&self) {
         println!("Tracker URL: {}", self.announce);
