@@ -232,6 +232,49 @@ fn main() {
             let torrent = Torrent::from_magnet(magnet).unwrap();
             torrent.print_info();
         },
+        "magnet_download_piece" => {
+            // magnet_download_piece -o /tmp/test-piece-0 <magnet-link> 0
+            let mut values_set = (false, false, false);
+            let mut set_storage_location = false;
+            let mut storage_location = String::new();
+            let mut magnet_link = String::new();
+            let mut piece_index = 0;
+            for i in 2..args.len() {
+                let arg = &args[i];
+                if set_storage_location {
+                    set_storage_location = false;
+                    storage_location = arg.into();
+                    values_set.0 = true;
+                    continue;
+                }
+                if arg == "-o" {
+                    set_storage_location = true;
+                    continue;
+                }
+                if !values_set.1 {
+                    magnet_link = arg.into();
+                    values_set.1 = true;
+                } else if !values_set.2 {
+                    piece_index = usize::from_str_radix(arg, 10).unwrap();
+                    values_set.2 = true;
+                } else {
+                    panic!("Unexpected parameter for download_piece");
+                }
+            }
+            if values_set != (true, true, true) {
+                panic!("Missing parameters for download_piece")
+            }
+
+            let magnet = Magnet::new(&magnet_link).unwrap();
+            let torrent = Torrent::from_magnet(magnet).unwrap();
+            let my_id = generate_random_string(20);
+            let peers = get_peers(&torrent.get_url(), &torrent.info.get_info_hash_bytes(), &my_id, torrent.info.get_file_size());
+            let peer = format!("{}:{}", peers[0].0, peers[0].1);
+            let piece = download_piece(&torrent, &my_id, &peer, piece_index);
+            let mut file = File::create(storage_location).unwrap();
+            file.write_all(&piece).unwrap();
+            println!("Piece downloaded.");
+        },
         _ => {
             println!("unknown command: {}", args[1])
         },
