@@ -275,6 +275,47 @@ fn main() {
             file.write_all(&piece).unwrap();
             println!("Piece downloaded.");
         },
+        "magnet_download" => {
+            let mut set_storage_location = false;
+            let mut storage_location = String::new();
+            let mut magnet_link = String::new();
+            let mut values_set = (false, false);
+            for i in 2..args.len() {
+                let arg = &args[i];
+                if set_storage_location {
+                    set_storage_location = false;
+                    storage_location = arg.into();
+                    values_set.0 = true;
+                    continue;
+                }
+                if arg == "-o" {
+                    set_storage_location = true;
+                    continue;
+                }
+                if !values_set.1 {
+                    magnet_link = arg.into();
+                    values_set.1 = true;
+                } else {
+                    panic!("Unexpected parameter for download_piece");
+                }
+            }
+            if values_set != (true, true) {
+                panic!("Missing parameters for download")
+            }
+            let magnet = Magnet::new(&magnet_link).unwrap();
+            let torrent = Torrent::from_magnet(magnet).unwrap();
+            let my_id = generate_random_string(20);
+            let peers = get_peers(&torrent.get_url(), &torrent.info.get_info_hash_bytes(), &my_id, torrent.info.get_file_size());
+            let piece_num = torrent.info.total_pieces();
+            let mut file_contents = vec![];
+            for i in 0..piece_num {
+                let peer = format!("{}:{}", peers[i%peers.len()].0, peers[i%peers.len()].1);
+                file_contents.extend(download_piece(&torrent, &my_id, &peer, i));
+            }
+            let mut file = File::create(storage_location).unwrap();
+            file.write_all(&file_contents).unwrap();
+            println!("File downloaded.")
+        },
         _ => {
             println!("unknown command: {}", args[1])
         },
