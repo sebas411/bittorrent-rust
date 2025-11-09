@@ -86,7 +86,7 @@ impl Torrent {
         let info = Info::new(torrent_map.get("info")?)?;
         Some(Self { announce, info })
     }
-    pub fn from_magnet(magnet: Magnet) -> Option<()> {
+    pub fn from_magnet(magnet: Magnet) -> Option<Self> {
         let my_id = generate_random_string(20);
         let info_hash = magnet.get_info_hash_bytes();
         let handshake = get_handshake(&info_hash, &my_id, true);
@@ -114,7 +114,8 @@ impl Torrent {
 
         //extension handshake
         let mut inner_dict = Map::new();
-        inner_dict.insert("ut_metadata".as_bytes().to_vec(), Value::Int(1));
+        let my_metadata_ext_id = 2;
+        inner_dict.insert("ut_metadata".as_bytes().to_vec(), Value::Int(my_metadata_ext_id));
         let mut outer_dict = Map::new();
         outer_dict.insert("m".as_bytes().to_vec(), Value::Map(inner_dict));
         let bencoded_value = encode_value(Value::Map(outer_dict));
@@ -130,6 +131,7 @@ impl Torrent {
         stream.read_exact(&mut buffer[4..4+length as usize]).expect("Failed to read from stream");
         let message_type = buffer[4];
         if message_type != 20 {
+            println!("Message didnt match");
             return None
         }
         let bencoded_dict = &buffer[6..4+length as usize];
@@ -151,7 +153,28 @@ impl Torrent {
 
         stream.write_all(&info_request).unwrap();
 
-        None
+        stream.read_exact(&mut buffer[..4]).unwrap();
+
+        let length = u32::from_be_bytes(buffer[0..4].try_into().unwrap());
+        stream.read_exact(&mut buffer[4..4+length as usize]).unwrap();
+        let message_id = buffer[4];
+        let extension_message_id = buffer[5];
+        if message_id != 20 || extension_message_id != my_metadata_ext_id as u8 {
+            println!("Message types didnt match");
+            println!("Message_id: {}", message_id);
+            println!("Extension_message_id: {}", extension_message_id);
+            println!("Metadata_ext_id: {}", metadata_ext_id);
+            return None;
+        }
+        let (_, rest) = decode_bencoded_value(&buffer[6..4+length as usize]);
+        let (metadata, _) = decode_bencoded_value(&rest);
+        let info = Info::new(metadata)?;
+        let info_hash = info.get_info_hash_bytes();
+        if info_hash != magnet.get_info_hash_bytes() {
+            println!("Info hash doesn't match");
+            return None
+        }
+        Some(Self { announce: magnet.get_url()?, info })
     }
     pub fn print_info(&self) {
         println!("Tracker URL: {}", self.announce);

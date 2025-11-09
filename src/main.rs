@@ -229,7 +229,8 @@ fn main() {
         "magnet_info" => {
             let magnet_link = &args[2];
             let magnet = Magnet::new(magnet_link).unwrap();
-            Torrent::from_magnet(magnet);
+            let torrent = Torrent::from_magnet(magnet).unwrap();
+            torrent.print_info();
         },
         _ => {
             println!("unknown command: {}", args[1])

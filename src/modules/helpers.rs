@@ -10,7 +10,11 @@ pub fn get_peers(announce: &str, info_hash: &[u8], peer_id: &str, file_size: usi
     let port = 6881;
     let query_params = format!("?info_hash={}&peer_id={}&port={}&uploaded=0&downloaded=0&left={}&compact=1", info_hash_encoded, peer_id, port, file_size);
     let url = req_url + &query_params;
-    let response = reqwest::blocking::get(url).unwrap().bytes().unwrap();
+    let result = reqwest::blocking::get(url);
+    if let Err(err) = &result {
+        println!("Error: {}", err.status().unwrap());
+    }
+    let response = result.unwrap().bytes().unwrap();
     let resp_dict = decode_bencoded_value(&response).0.get_map().unwrap();
     let peers = resp_dict.get("peers").unwrap().get_string().unwrap();
     let peers = bytes_to_peer_list(&peers);
